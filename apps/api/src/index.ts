@@ -30,6 +30,10 @@ fastify.register(cors, {
       return cb(null, true);
     }
 
+    if (/^https:\/\/.*\.(railway\.app|up\.railway\.app)$/.test(origin)) {
+      return cb(null, true);
+    }
+
     return cb(null, false);
   },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
