@@ -122,7 +122,7 @@ export default function Editor() {
 
     const img = new Image();
     img.crossOrigin = "anonymous";
-    img.src = `${API_URL}${page.imageUrl}`;
+    img.src = page.imageUrl.startsWith("http") ? page.imageUrl : `${API_URL}${page.imageUrl}`;
     img.onload = () => {
       canvas.width = img.width;
       canvas.height = img.height;

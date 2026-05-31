@@ -131,7 +131,7 @@ export default function Dashboard() {
                 <div className="aspect-[3/4] bg-slate-50 flex items-center justify-center border-b border-slate-100 relative overflow-hidden group">
                   {doc.pages?.[0]?.imageUrl ? (
                     <img
-                      src={`${API_URL}${doc.pages[0].imageUrl}`}
+                      src={doc.pages[0].imageUrl.startsWith("http") ? doc.pages[0].imageUrl : `${API_URL}${doc.pages[0].imageUrl}`}
                       alt={doc.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />

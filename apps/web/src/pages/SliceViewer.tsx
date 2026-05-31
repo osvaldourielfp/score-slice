@@ -103,7 +103,7 @@ export default function SliceViewer() {
 
     const img = new Image();
     img.crossOrigin = "anonymous";
-    img.src = `${API_URL}${currentPage.imageUrl}`;
+    img.src = currentPage.imageUrl.startsWith("http") ? currentPage.imageUrl : `${API_URL}${currentPage.imageUrl}`;
     img.onload = () => {
       // Normalize dimensions for display
       const sourceX = currentSlice.width < 0 ? currentSlice.x + currentSlice.width : currentSlice.x;
