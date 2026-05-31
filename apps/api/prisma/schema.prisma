@@ -1,0 +1,80 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String?
+  documents Document[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Document {
+  id        String   @id @default(uuid())
+  title     String
+  filePath  String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  pages     Page[]
+  sessions  SliceSession[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Page {
+  id         String   @id @default(uuid())
+  pageNumber Int
+  imageUrl   String
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id])
+  slices     Slice[]
+  comments   Comment[]
+  createdAt  DateTime @default(now())
+}
+
+model SliceSession {
+  id         String   @id @default(uuid())
+  name       String
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id])
+  slices     Slice[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Slice {
+  id        String   @id @default(uuid())
+  x         Float
+  y         Float
+  width     Float
+  height    Float
+  pageId    String
+  page      Page     @relation(fields: [pageId], references: [id])
+  sessionId String
+  session   SliceSession @relation(fields: [sessionId], references: [id])
+  comments  Comment[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  content   String
+  pageId    String?
+  page      Page?    @relation(fields: [pageId], references: [id])
+  sliceId   String?
+  slice     Slice?   @relation(fields: [sliceId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
