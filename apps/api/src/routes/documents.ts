@@ -22,57 +22,65 @@ export default async function documentRoutes(fastify: FastifyInstance) {
 
   fastify.post("/upload", async (request: FastifyRequest, reply: FastifyReply) => {
     let documentId: string | null = null;
-    let filePath: string | null = null;
     let fileName: string | null = null;
-    let tempImageDir: string | null = null;
     const uploadedUrls: string[] = [];
 
     try {
-      const data = await request.file();
-      if (!data) return reply.code(400).send({ message: "No file uploaded" });
-
       const user = request.user as UserPayload;
-      const rootDir = process.cwd();
-      const uploadDir = path.join(rootDir, "uploads/tmp");
-      fileName = `${Date.now()}-${data.filename}`;
-      filePath = path.join(uploadDir, fileName);
-      tempImageDir = path.join(uploadDir, `${Date.now()}-images`);
+      
+      let pdfFile: { filename: string; buffer: Buffer } | null = null;
+      const imageFiles: { filename: string; buffer: Buffer }[] = [];
 
-      if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-      if (!fs.existsSync(tempImageDir)) fs.mkdirSync(tempImageDir, { recursive: true });
+      for await (const part of request.parts()) {
+        if (part.type === "file") {
+          const buffer = await part.toBuffer();
+          if (part.fieldname === "pdf") {
+            pdfFile = {
+              filename: part.filename,
+              buffer,
+            };
+          } else if (part.fieldname === "images") {
+            imageFiles.push({
+              filename: part.filename,
+              buffer,
+            });
+          }
+        }
+      }
 
-      // Save the file using a buffer to ensure it's fully written before processing
-      const buffer = await data.toBuffer();
-      fs.writeFileSync(filePath, buffer);
+      if (!pdfFile) {
+        return reply.code(400).send({ message: "No PDF file uploaded" });
+      }
 
-      const stats = fs.statSync(filePath);
-      fastify.log.info(`File uploaded: ${data.filename}, Size: ${stats.size} bytes`);
+      fileName = `${Date.now()}-${pdfFile.filename}`;
 
       // Verify PDF Header (%PDF-)
-      const header = buffer.toString("utf8", 0, 5);
+      const header = pdfFile.buffer.toString("utf8", 0, 5);
       if (header !== "%PDF-") {
         throw new Error(`Invalid PDF header: ${header}. The file might be corrupted or not a PDF.`);
       }
 
-      // Convert PDF to images locally in the temp directory
-      const imageUrls = await PdfService.convertToImages(filePath, tempImageDir);
-
       // Upload PDF to Supabase Storage
-      await SupabaseService.uploadPdf(fileName, buffer);
+      await SupabaseService.uploadPdf(fileName, pdfFile.buffer);
 
-      // Upload converted images to Supabase Storage and collect their public URLs
-      for (const url of imageUrls) {
-        const imageName = path.basename(url);
-        const imageLocalPath = path.join(tempImageDir, imageName);
-        const imageBuffer = fs.readFileSync(imageLocalPath);
-        const publicUrl = await SupabaseService.uploadImage(imageName, imageBuffer);
+      // Sort images by page number from filename to ensure correct page ordering
+      imageFiles.sort((a, b) => {
+        const aNum = parseInt(a.filename.match(/-page-(\d+)\.png$/)?.[1] || "0", 10);
+        const bNum = parseInt(b.filename.match(/-page-(\d+)\.png$/)?.[1] || "0", 10);
+        return aNum - bNum;
+      });
+
+      // Upload converted images to Supabase Storage and collect public URLs
+      for (const img of imageFiles) {
+        const imgName = `${Date.now()}-${img.filename}`;
+        const publicUrl = await SupabaseService.uploadImage(imgName, img.buffer);
         uploadedUrls.push(publicUrl);
       }
 
       // Create records in the database
       const document = await prisma.document.create({
         data: {
-          title: data.filename,
+          title: pdfFile.filename,
           filePath: fileName,
           userId: user.id,
         },
@@ -86,16 +94,6 @@ export default async function documentRoutes(fastify: FastifyInstance) {
           imageUrl: publicUrl,
         })),
       });
-
-      // Cleanup local temp files on success
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-      if (fs.existsSync(tempImageDir)) {
-        const files = fs.readdirSync(tempImageDir);
-        for (const file of files) {
-          fs.unlinkSync(path.join(tempImageDir, file));
-        }
-        fs.rmdirSync(tempImageDir);
-      }
 
       return { document, pages: uploadedUrls.length };
     } catch (error: any) {
@@ -113,20 +111,6 @@ export default async function documentRoutes(fastify: FastifyInstance) {
       }
       for (const url of uploadedUrls) {
         await SupabaseService.deleteImage(url).catch(() => {});
-      }
-
-      // Local files cleanup on failure
-      if (filePath && fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
-      if (tempImageDir && fs.existsSync(tempImageDir)) {
-        try {
-          const files = fs.readdirSync(tempImageDir);
-          for (const file of files) {
-            fs.unlinkSync(path.join(tempImageDir, file));
-          }
-          fs.rmdirSync(tempImageDir);
-        } catch {}
       }
 
       return reply.code(500).send({ 

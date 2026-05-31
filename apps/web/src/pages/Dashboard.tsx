@@ -4,6 +4,8 @@ import { Upload, FileText, Plus, LogOut, Trash2, Play, Scissors } from "lucide-r
 import { useNavigate } from "react-router-dom";
 import { env } from "../config/env";
 
+import { convertPdfToImages } from "../utils/pdf";
+
 const API_URL = env.API_URL;
 
 export default function Dashboard() {
@@ -24,14 +26,26 @@ export default function Dashboard() {
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
+      // 1. Render PDF pages to PNG Blobs client-side
+      const imageBlobs = await convertPdfToImages(file);
+
+      // 2. Build multipart form data
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("pdf", file, file.name);
+
+      imageBlobs.forEach((blob, index) => {
+        const imageName = `${file.name.replace(/\.[^/.]+$/, "")}-page-${index + 1}.png`;
+        formData.append("images", blob, imageName);
+      });
+
+      // 3. Upload to backend
       const { data } = await axios.post(
         `${API_URL}/documents/upload`,
         formData,
         {
           headers: {
             Authorization: `Bearer ${token}`,
+            "Content-Type": "multipart/form-data",
           },
         },
       );
@@ -39,11 +53,11 @@ export default function Dashboard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["documents"] });
-      alert("Upload successful!");
+      alert("Upload and conversion successful!");
     },
     onError: (error: any) => {
       console.error("Upload error:", error);
-      alert(error.response?.data?.message || "Failed to upload file. See console for details.");
+      alert(error.response?.data?.message || "Failed to process and upload file.");
     },
   });
 
@@ -196,6 +210,14 @@ export default function Dashboard() {
           </div>
         )}
       </main>
+
+      {uploadMutation.isPending && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-[2px] flex flex-col items-center justify-center text-white z-50">
+          <div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin mb-4"></div>
+          <p className="font-semibold text-lg">Converting PDF and uploading...</p>
+          <p className="text-sm text-slate-300 mt-1">This processes all pages inside your browser and uploads them directly.</p>
+        </div>
+      )}
     </div>
   );
 }
