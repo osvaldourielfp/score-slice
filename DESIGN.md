@@ -57,6 +57,9 @@ spacing:
 
 Este documento define el lenguaje visual y los tokens de diseño de **Score-Slice** siguiendo la especificación oficial de **Google Stitch**. Actúa como una fuente de verdad para que tanto desarrolladores como agentes de IA mantengan la coherencia visual.
 
+> [!NOTE]
+> En la implementación actual, estos tokens están definidos como propiedades personalizadas de CSS dentro de la directiva `@theme` en el archivo de estilos principal del frontend: [index.css](file:///Users/osvaldo/Documents/Desarrollo/score-slice/apps/web/src/index.css).
+
 ## ## Overview
 La estética de **Score-Slice** se define como **"Minimalismo Funcional con Acentos de Precisión"**. El objetivo es proporcionar un entorno de trabajo limpio y sin distracciones para músicos, utilizando efectos de "glassmorphism", elevaciones sutiles y una jerarquía tipográfica clara.
 

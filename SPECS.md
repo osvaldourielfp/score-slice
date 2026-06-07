@@ -8,12 +8,12 @@
 ## 2. Tech Stack (Current)
 - **Architecture:** Monorepo using NPM Workspaces.
 - **Language:** TypeScript (Strict mode, ESM enabled).
-- **Frontend:** React.js (Vite) with **Tailwind CSS v4** (CSS-first configuration).
-- **Backend:** Node.js with **Fastify 5**.
+- **Frontend:** React.js (Vite) with **Tailwind CSS v4** (CSS-first configuration) and **PDF.js** (`pdfjs-dist`) for client-side rendering.
+- **Backend:** Node.js with **Fastify 5** (running on port 3001) and **Supabase JS Client** for storage operations.
 - **Runtime:** `tsx` for development execution.
 - **Database:** PostgreSQL with **Prisma ORM**.
-- **File Storage:** Local storage (`/uploads/pdfs` and `/uploads/images`).
-- **PDF Processing:** Hybrid approach using **Python (pdf2image/Pillow)** and **Poppler** for high-fidelity conversion.
+- **File Storage:** Cloud storage using **Supabase Storage** (private bucket `pdfs` and public bucket `images`).
+- **PDF Processing:** Client-side rendering of pages to PNG using **PDF.js** inside the browser. Fallback/legacy: Local python script (`pdf_to_images.py`) with `pdf2image`/`Pillow` & `poppler` on the backend.
 - **Linting:** ESLint 9+ with TypeScript-specific rules.
 
 ---
@@ -21,10 +21,10 @@
 ## 3. Functional Requirements (Implemented)
 
 ### 3.1 Document Management
-- **Upload:** Users can upload PDF files up to 50MB. Includes header verification to prevent corruption.
-- **Conversion:** Asynchronous conversion of PDF pages into high-resolution PNG images via a specialized Python bridge.
+- **Upload:** Users can upload PDF files up to 50MB. The frontend renders PDF pages into high-resolution PNG images client-side before sending them. It sends a multipart/form-data request containing the original PDF and the page PNG images.
+- **Conversion:** Performed in-browser using PDF.js (`pdfjs-dist`). Fallback/legacy: Python bridge (`pdf_to_images.py`) on the backend.
 - **Gallery:** A responsive dashboard to view, manage, and delete uploaded documents.
-- **Deletion:** Full cleanup of database records and filesystem assets (PDFs and images).
+- **Deletion:** Full cleanup of database records and Supabase Storage assets (PDF files in `pdfs` bucket, PNG images in `images` bucket).
 
 ### 3.2 Slicing & Editor
 - **Image Viewer:** High-performance canvas-based interface.
