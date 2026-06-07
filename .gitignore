@@ -74,3 +74,6 @@ uploads/
 
 example-scripts/
 example-files/
+
+skills-lock.json
+.agents/*
