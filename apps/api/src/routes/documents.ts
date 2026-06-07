@@ -11,6 +11,13 @@ interface UserPayload {
   email: string;
 }
 
+function sanitizeFilename(filename: string): string {
+  return filename
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9.-]/g, "_");
+}
+
 export default async function documentRoutes(fastify: FastifyInstance) {
   fastify.addHook("preHandler", async (request: FastifyRequest) => {
     try {
@@ -52,16 +59,13 @@ export default async function documentRoutes(fastify: FastifyInstance) {
         return reply.code(400).send({ message: "No PDF file uploaded" });
       }
 
-      fileName = `${Date.now()}-${pdfFile.filename}`;
+      fileName = `${Date.now()}-${sanitizeFilename(pdfFile.filename)}`;
 
       // Verify PDF Header (%PDF-)
       const header = pdfFile.buffer.toString("utf8", 0, 5);
       if (header !== "%PDF-") {
         throw new Error(`Invalid PDF header: ${header}. The file might be corrupted or not a PDF.`);
       }
-
-      // Upload PDF to Supabase Storage
-      await SupabaseService.uploadPdf(fileName, pdfFile.buffer);
 
       // Sort images by page number from filename to ensure correct page ordering
       imageFiles.sort((a, b) => {
@@ -70,10 +74,12 @@ export default async function documentRoutes(fastify: FastifyInstance) {
         return aNum - bNum;
       });
 
+      const folderName = fileName.replace(/\.[^/.]+$/, "");
+
       // Upload converted images to Supabase Storage and collect public URLs
       for (const img of imageFiles) {
-        const imgName = `${Date.now()}-${img.filename}`;
-        const publicUrl = await SupabaseService.uploadImage(imgName, img.buffer);
+        const imgPath = `${folderName}/${sanitizeFilename(img.filename)}`;
+        const publicUrl = await SupabaseService.uploadImage(imgPath, img.buffer);
         uploadedUrls.push(publicUrl);
       }
 
@@ -105,10 +111,6 @@ export default async function documentRoutes(fastify: FastifyInstance) {
         await prisma.document.delete({ where: { id: documentId } }).catch(() => {});
       }
 
-      // Storage cleanup on failure
-      if (fileName) {
-        await SupabaseService.deletePdf(fileName).catch(() => {});
-      }
       for (const url of uploadedUrls) {
         await SupabaseService.deleteImage(url).catch(() => {});
       }
@@ -142,9 +144,6 @@ export default async function documentRoutes(fastify: FastifyInstance) {
     }
 
     try {
-      // Delete PDF from Supabase Storage
-      await SupabaseService.deletePdf(document.filePath);
-      
       // Delete page images from Supabase Storage
       for (const page of document.pages) {
         await SupabaseService.deleteImage(page.imageUrl);
