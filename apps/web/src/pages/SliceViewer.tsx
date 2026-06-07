@@ -13,6 +13,15 @@ export default function SliceViewer() {
   const { search } = useLocation();
   const token = localStorage.getItem("token");
   const [currentSliceIdx, setCurrentSliceIdx] = useState(0);
+  const [showComments, setShowComments] = useState(() => {
+    return localStorage.getItem("showComments") !== "false";
+  });
+
+  const handleToggleComments = (checked: boolean) => {
+    setShowComments(checked);
+    localStorage.setItem("showComments", String(checked));
+  };
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Get startPage from URL params reactively
@@ -195,11 +204,21 @@ export default function SliceViewer() {
           </button>
         </div>
 
-        <div className="w-[100px]"></div> {/* Spacer */}
+        <div className="flex items-center gap-2">
+          <label className="flex items-center gap-2 text-xs font-bold text-slate-400 cursor-pointer select-none hover:text-white transition bg-black/40 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 shadow-2xl">
+            <input
+              type="checkbox"
+              checked={showComments}
+              onChange={(e) => handleToggleComments(e.target.checked)}
+              className="rounded border-white/20 bg-white/5 text-primary-500 focus:ring-primary-500 focus:ring-offset-slate-950 h-4 w-4"
+            />
+            <span>Show Notes</span>
+          </label>
+        </div>
       </header>
 
       {/* Main Viewport */}
-      <div className="flex-1 flex flex-col items-center justify-center p-12 pt-32 pb-40">
+      <div className={`flex-1 flex flex-col items-center justify-center p-12 pt-32 ${showComments ? "pb-40" : "pb-16"}`}>
         <div className="relative group max-w-full">
           <div className="absolute -inset-1 bg-gradient-to-r from-primary-500 to-amber-500 rounded-lg blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
           <div className="relative bg-white p-2 rounded-lg shadow-2xl shadow-primary-500/10">
@@ -212,24 +231,26 @@ export default function SliceViewer() {
       </div>
 
       {/* Footer Comments Overlay */}
-      <footer className="absolute bottom-0 left-0 right-0 p-8 flex justify-center z-20">
-        <div className="max-w-2xl w-full bg-slate-900/80 backdrop-blur-xl border border-white/10 rounded-3xl p-6 shadow-2xl">
-          <div className="flex items-center gap-3 mb-4 text-slate-400">
-            <MessageSquare size={18} strokeWidth={2.5} className="text-primary-500" />
-            <h3 className="text-xs font-black uppercase tracking-widest">Slice Notes</h3>
+      {showComments && (
+        <footer className="absolute bottom-0 left-0 right-0 p-8 flex justify-center z-20">
+          <div className="max-w-2xl w-full bg-slate-900/80 backdrop-blur-xl border border-white/10 rounded-3xl p-6 shadow-2xl">
+            <div className="flex items-center gap-3 mb-4 text-slate-400">
+              <MessageSquare size={18} strokeWidth={2.5} className="text-primary-500" />
+              <h3 className="text-xs font-black uppercase tracking-widest">Slice Notes</h3>
+            </div>
+            <div className="space-y-3 max-h-24 overflow-auto scrollbar-hide">
+              {comments?.map((c: any) => (
+                <p key={c.id} className="text-sm text-slate-200 leading-relaxed font-medium bg-white/5 p-3 rounded-xl border border-white/5">
+                  {c.content}
+                </p>
+              ))}
+              {(!comments || comments.length === 0) && (
+                <p className="text-sm text-slate-500 italic">No notes for this fragment.</p>
+              )}
+            </div>
           </div>
-          <div className="space-y-3 max-h-24 overflow-auto scrollbar-hide">
-            {comments?.map((c: any) => (
-              <p key={c.id} className="text-sm text-slate-200 leading-relaxed font-medium bg-white/5 p-3 rounded-xl border border-white/5">
-                {c.content}
-              </p>
-            ))}
-            {(!comments || comments.length === 0) && (
-              <p className="text-sm text-slate-500 italic">No notes for this fragment.</p>
-            )}
-          </div>
-        </div>
-      </footer>
+        </footer>
+      )}
 
       {/* Progress Bar */}
       <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-white/5">

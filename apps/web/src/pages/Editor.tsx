@@ -27,6 +27,15 @@ export default function Editor() {
   const [isDrawing, setIsDrawing] = useState(false);
   const [selectedSliceId, setSelectedSliceId] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
+  const [showComments, setShowComments] = useState(() => {
+    return localStorage.getItem("showComments") !== "false";
+  });
+
+  const handleToggleComments = (checked: boolean) => {
+    setShowComments(checked);
+    localStorage.setItem("showComments", String(checked));
+  };
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const { data: document } = useQuery({
@@ -314,7 +323,7 @@ export default function Editor() {
         </div>
 
         <aside className="w-[400px] bg-white border-l border-slate-200 flex flex-col shadow-[-4px_0_15px_-3px_rgba(0,0,0,0.05)] z-10 relative">
-          <div className="p-6 border-b border-slate-100 bg-white z-10">
+          <div className={`p-6 bg-white z-10 flex flex-col ${showComments ? "border-b border-slate-100" : "flex-1"}`}>
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-2.5 text-slate-900">
                 <div className="p-2 bg-primary-50 rounded-lg text-primary-600">
@@ -322,18 +331,31 @@ export default function Editor() {
                 </div>
                 <h2 className="text-lg font-black tracking-tight">Annotations</h2>
               </div>
-              {selectedSliceId && (
-                <button
-                  onClick={() => setSelectedSliceId(null)}
-                  className="text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 p-1.5 rounded-lg transition"
-                  title="Clear selection"
-                >
-                  <X size={16} strokeWidth={2.5} />
-                </button>
-              )}
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 cursor-pointer select-none hover:text-slate-800 transition">
+                  <input
+                    type="checkbox"
+                    checked={showComments}
+                    onChange={(e) => handleToggleComments(e.target.checked)}
+                    className="rounded border-slate-300 text-primary-600 focus:ring-primary-500 h-3.5 w-3.5"
+                  />
+                  <span>Show Notes</span>
+                </label>
+                {selectedSliceId && (
+                  <button
+                    onClick={() => setSelectedSliceId(null)}
+                    className="text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 p-1.5 rounded-lg transition"
+                    title="Clear selection"
+                  >
+                    <X size={16} strokeWidth={2.5} />
+                  </button>
+                )}
+              </div>
             </div>
 
-            <div className="space-y-3 max-h-[30vh] overflow-auto pr-2 scrollbar-thin scrollbar-thumb-slate-200">
+            <div className={`space-y-3 overflow-auto pr-2 scrollbar-thin scrollbar-thumb-slate-200 ${
+              showComments ? "max-h-[30vh]" : "flex-1"
+            }`}>
               {session?.slices
                 ?.filter((s: any) => s.pageId === page?.id)
                 .map((s: any, idx: number) => (
@@ -369,61 +391,63 @@ export default function Editor() {
             </div>
           </div>
 
-          <div className="flex-1 flex flex-col bg-slate-50/80 overflow-hidden relative">
-            <div className="p-6 pb-2">
-              <div className="flex items-center gap-2.5 mb-2 text-slate-700">
-                <MessageSquare size={16} strokeWidth={2.5} className={selectedSliceId ? 'text-amber-500' : 'text-primary-500'} />
-                <h3 className="text-sm font-bold uppercase tracking-widest">
-                  {selectedSliceId ? "Slice Notes" : "Page Notes"}
-                </h3>
+          {showComments && (
+            <div className="flex-1 flex flex-col bg-slate-50/80 overflow-hidden relative">
+              <div className="p-6 pb-2">
+                <div className="flex items-center gap-2.5 mb-2 text-slate-700">
+                  <MessageSquare size={16} strokeWidth={2.5} className={selectedSliceId ? 'text-amber-500' : 'text-primary-500'} />
+                  <h3 className="text-sm font-bold uppercase tracking-widest">
+                    {selectedSliceId ? "Slice Notes" : "Page Notes"}
+                  </h3>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-auto space-y-4 px-6 pb-4 scrollbar-thin scrollbar-thumb-slate-200">
+                {comments?.map((c: any) => (
+                  <div
+                    key={c.id}
+                    className={`bg-white border p-4 rounded-2xl shadow-sm ${selectedSliceId ? 'border-amber-100' : 'border-slate-200'}`}
+                  >
+                    <p className="text-sm text-slate-700 leading-relaxed">{c.content}</p>
+                    <span className="text-[10px] font-medium text-slate-400 mt-3 block uppercase tracking-wider">
+                      {new Date(c.createdAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+                    </span>
+                  </div>
+                ))}
+                {comments?.length === 0 && (
+                  <div className="text-center py-12 text-slate-400 text-sm">
+                    <MessageSquare size={32} strokeWidth={1} className="mx-auto mb-3 opacity-50" />
+                    No notes yet.
+                  </div>
+                )}
+              </div>
+
+              <div className="p-6 bg-white border-t border-slate-200">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (commentText.trim()) addCommentMutation.mutate(commentText);
+                  }}
+                  className="relative"
+                >
+                  <textarea
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 pr-14 text-sm focus:ring-2 focus:ring-primary-500 focus:bg-white outline-none resize-none transition-all"
+                    placeholder="Add a note..."
+                    rows={3}
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                  />
+                  <button
+                    type="submit"
+                    disabled={!commentText.trim()}
+                    className="absolute bottom-3 right-3 p-2.5 bg-primary-600 text-white rounded-lg disabled:opacity-40 disabled:hover:bg-primary-600 hover:bg-primary-700 transition-colors shadow-sm"
+                  >
+                    <Send size={16} strokeWidth={2.5} />
+                  </button>
+                </form>
               </div>
             </div>
-
-            <div className="flex-1 overflow-auto space-y-4 px-6 pb-4 scrollbar-thin scrollbar-thumb-slate-200">
-              {comments?.map((c: any) => (
-                <div
-                  key={c.id}
-                  className={`bg-white border p-4 rounded-2xl shadow-sm ${selectedSliceId ? 'border-amber-100' : 'border-slate-200'}`}
-                >
-                  <p className="text-sm text-slate-700 leading-relaxed">{c.content}</p>
-                  <span className="text-[10px] font-medium text-slate-400 mt-3 block uppercase tracking-wider">
-                    {new Date(c.createdAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
-                  </span>
-                </div>
-              ))}
-              {comments?.length === 0 && (
-                <div className="text-center py-12 text-slate-400 text-sm">
-                  <MessageSquare size={32} strokeWidth={1} className="mx-auto mb-3 opacity-50" />
-                  No notes yet.
-                </div>
-              )}
-            </div>
-
-            <div className="p-6 bg-white border-t border-slate-200">
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (commentText.trim()) addCommentMutation.mutate(commentText);
-                }}
-                className="relative"
-              >
-                <textarea
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 pr-14 text-sm focus:ring-2 focus:ring-primary-500 focus:bg-white outline-none resize-none transition-all"
-                  placeholder="Add a note..."
-                  rows={3}
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                />
-                <button
-                  type="submit"
-                  disabled={!commentText.trim()}
-                  className="absolute bottom-3 right-3 p-2.5 bg-primary-600 text-white rounded-lg disabled:opacity-40 disabled:hover:bg-primary-600 hover:bg-primary-700 transition-colors shadow-sm"
-                >
-                  <Send size={16} strokeWidth={2.5} />
-                </button>
-              </form>
-            </div>
-          </div>
+          )}
         </aside>
       </div>
     </div>
